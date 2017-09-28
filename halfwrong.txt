@@ -1,0 +1,252 @@
+import java.util.HashMap;
+import edu.princeton.cs.algs4.FordFulkerson;
+import edu.princeton.cs.algs4.FlowNetwork;
+import edu.princeton.cs.algs4.FlowEdge;
+import java.util.ArrayList;
+import java.util.Arrays;
+public class BaseballElimination {
+    private int[] w; //wins
+    private int[] l; //losses
+    private int[] r; //remaining
+    private int[][] g; //games left against each
+    private HashMap<String, Integer> sTon;
+    private int N; //number of teams
+    //private String[] teams;
+    private HashMap<String, ArrayList<String>> teams;
+
+    public BaseballElimination(String filename) {   // create a baseball division from given filename in format specified below
+        In in = new In(filename);
+        N = in.readInt();
+        teams = new String[N];
+        w = new int[N];
+        l = new int[N];
+        r = new int[N];
+        g = new int[N][N];
+        sTon = new HashMap<String, Integer>();
+        teams = new HashMap<String, ArrayList<String>>();
+        for (int i = 0; i < N; i++) {
+            String team = in.readString();
+            w[i] = in.readInt();
+            l[i] = in.readInt();
+            r[i] = in.readInt();
+            sTon.put(team, i);
+            teams.put(team, null);
+            for (int j = 0; j < N; j++) {
+                g[i][j] = in.readInt();
+            }
+        }
+    }   
+
+    public int numberOfTeams() {            // number of teams
+        return N;
+    }
+
+    public Iterable<String> teams() {      // all teams
+        return sTon.keySet();
+    }
+
+    public int wins(String team) {         // number of wins for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return w[sTon.get(team)];
+    }
+
+    public int losses(String team) {      // number of losses for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return l[sTon.get(team)];
+    }
+
+    public int remaining(String team) {  // number of remaining games for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return r[sTon.get(team)];
+    }
+
+    public int against(String team1, String team2) {   // number of remaining games between team1 and team2
+        if (!sTon.containsKey(team1) || !sTon.containsKey(team2)) {
+            throw new IllegalArgumentException("one or both of the teams invalid.");
+        }
+        return g[sTon.get(team1)][sTon.get(team2)];
+    }
+
+    public boolean isEliminated(String team) {     // is given team eliminated?
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        
+        if (teams.containsKey(team) != null) {
+            return true;
+        } else if (!teams.containsKey(team)) {
+            return false;
+        }
+        return certificate(team) != null;
+        //         for (int i = 0; i < N; i++) {
+        //             if (i != sTon.get(team)) {
+        //                 if (w[sTon.get(team)] + r[sTon.get(team)] < w[i]) {
+        //                     return true;
+        //                 }
+        //             }
+        //         }
+        // 
+        //         FlowNetwork maxflow = network(team);
+        //         int s = 0; //source
+        //         int t = maxflow.V() - 1; //sink
+        // 
+        //         for (FlowEdge edge : maxflow.adj(s)) {
+        //             if(edge.flow() < edge.capacity()) {
+        //                 return true;
+        //             }
+        //         }
+        // 
+        //         return false;
+    }
+
+    private FlowNetwork flownetwork(String team) {
+      int v = N + (N - 1) * (N - 2) / 2 + 2;
+        int s = v - 2;
+        int t  = v - 1;
+        FlowNetwork network = new FlowNetwork(v);
+
+        for (int i = 0, nOfv = N; i < N; i++) {
+            if (i == sTon.get(team)) {
+                for (int j = i + 1; j < N; j++) { 
+                    if (j == sTon.get(team)) {
+                        network.addEdge(new FlowEdge(s, nOfv, g[i][j]));
+                        network.addEdge(new FlowEdge(nOfv, i, g[i][j]));
+                        network.addEdge(new FlowEdge(nOfv, j, g[i][j]));
+                        nOfv++;
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < N; i++) {
+            if ( i != sTon.get(team)) {
+                network.addEdge(new FlowEdge(i, t, w[sTon.get(team)] + r[sTon.get(team)] - w[i]));
+            }     
+        }
+        return network;
+    }
+    
+    private Iterable<String> certificate (String team) {
+        ArrayList<String> c = new ArrayList<String>();
+        for (int i = 0; i < N; i++) {
+            if (i != sTon.get(team)) {
+                if (w[sTon.get(team)] + r[sTon.get(team)] < w[i]) {
+                    return Arrays.asList(teams[i]); 
+                }
+            }
+        }
+        int v = N + (N - 1) * (N - 2) / 2 + 2;
+        int s = v - 2;
+        int t  = v - 1;
+        FlowNetwork network = new FlowNetwork(v);
+
+        for (int i = 0, nOfv = N; i < N; i++) {
+            if (i == sTon.get(team)) {
+                for (int j = i + 1; j < N; j++) { 
+                    if (j == sTon.get(team)) {
+                        network.addEdge(new FlowEdge(s, nOfv, g[i][j]));
+                        network.addEdge(new FlowEdge(nOfv, i, g[i][j]));
+                        network.addEdge(new FlowEdge(nOfv, j, g[i][j]));
+                        nOfv++;
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < N; i++) {
+            if ( i != sTon.get(team)) {
+                network.addEdge(new FlowEdge(i, t, w[sTon.get(team)] + r[sTon.get(team)] - w[i]));
+            }     
+        }
+
+        FordFulkerson ff = new FordFulkerson(network, s, t);
+        for (int nOfv = 0; nOfv < N; nOfv++) {
+            if (ff.inCut(nOfv)) {
+                c.add(teams[nOfv]);
+            }
+        }
+        return c.isEmpty() ? null : c;
+    }
+    //     private FlowNetwork network (String team) {
+    //         //number of games 
+    //         //int nOfg = numberOfTeams() * (numberOfTeams() - 1) / 2;
+    //         //number of vertices 
+    //         //int nOfv = 1 + nOfg + numberOfTeams() + 1;
+    //         int v = N + (N - 1) * (N - 2) / 2 + 2;
+    //         //source
+    //         //int s = 0;
+    //         int s = v - 2;
+    //         //sink
+    //         //int t = nOfv - 1;
+    //         int t  = v - 1;
+    //         //int v = 1;
+    //         //FlowNetwork maxflow = new FlowNetwork(nOfv);
+    //         FlowNetwork maxflow = new FlowNetwork(v);
+    //         for (int i = 0, nOfv = N; i < N; i++) {
+    //             if (i == sTon.get(team)) {
+    //                 for (int j = i + 1; j < N; j++) { 
+    //                     if (j == sTon.get(team)) {
+    //                         maxflow.addEdge(new FlowEdge(s, nOfv, g[i][j]));
+    //                         maxflow.addEdge(new FlowEdge(nOfv, i, g[i][j]));
+    //                         maxflow.addEdge(new FlowEdge(nOfv, j, g[i][j]));
+    //                         nOfv++;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    // 
+    //         for (int i = 0; i < N; i++) {
+    //             if ( i != sTon.get(team)) {
+    //                 maxflow.addEdge(new FlowEdge(i, t, w[sTon.get(team)] + r[sTon.get(team)] - w[i]));
+    //             }     
+    //         }
+    //         return maxflow;
+    //     }
+
+    public Iterable<String> certificateOfElimination(String team) { // subset R of teams that eliminates given team; null if not eliminated
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+
+        if (!isEliminated(team)) {
+            return null;
+        }
+
+        //ArrayList<String> el = new ArrayList<String>();
+        //         int ng = numberOfTeams() * (numberOfTeams() - 1) / 2;
+        //         FlowNetwork maxflow = network(team);
+        //         int s = 0; //source
+        //         int t = maxflow.V() - 1; //sink
+        //         FordFulkerson ff = new FordFulkerson(maxflow, s, t);
+        //         for(String i : teams()) {
+        //             int id = sTon.get(i);
+        //             int v = ng + 1 + id;
+        //             if (ff.inCut(v)) {
+        //                 el.add(i);
+        //             }
+        //         }
+
+        return certificate(team);
+    }
+
+    public static void main(String[] args) { //from assignment 
+        BaseballElimination division = new BaseballElimination(args[0]);
+        for (String team : division.teams()) {
+            if (division.isEliminated(team)) {
+                StdOut.print(team + " is eliminated by the subset R = { ");
+                for (String t : division.certificateOfElimination(team))
+                    StdOut.print(t + " ");
+                StdOut.println("}");
+            }
+            else {
+                StdOut.println(team + " is not eliminated");
+            }
+        }
+    }
+}

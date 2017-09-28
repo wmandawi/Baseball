@@ -1,0 +1,185 @@
+import java.util.HashMap;
+import edu.princeton.cs.algs4.FlowNetwork;
+import edu.princeton.cs.algs4.FordFulkerson;
+import edu.princeton.cs.algs4.FlowNetwork;
+import edu.princeton.cs.algs4.FlowEdge;
+import java.util.ArrayList;
+import edu.princeton.cs.algs4.Bag;
+public class BaseballElimination {
+    private int[] w; //wins
+    private int[] l; //losses
+    private int[] r; //remaining
+    private int[][] g; //games left against each
+    private HashMap<String, Integer> sTon;
+    private int N; //number of teams
+    private int maxW = Integer.MIN_VALUE; //max win
+
+    public BaseballElimination(String filename) {   // create a baseball division from given filename in format specified below
+        In in = new In(filename);
+        N = in.readInt();
+        w = new int[N];
+        l = new int[N];
+        r = new int[N];
+        g = new int[N][N];
+        sTon = new HashMap<String, Integer>();
+
+        for (int i = 0; i < N; i++) {
+            String team = in.readString();
+            w[i] = in.readInt();
+            l[i] = in.readInt();
+            r[i] = in.readInt();
+            sTon.put(team, i);
+            for (int j = 0; j < N; j++) {
+                g[i][j] = in.readInt();
+            }
+
+            //             if (w[i] > maxW) {
+            //                 maxW = w[i];
+            //             }
+        }
+    }   
+
+    public int numberOfTeams() {            // number of teams
+        return N;
+    }
+
+    public Iterable<String> teams() {      // all teams
+        return sTon.keySet();
+    }
+
+    public int wins(String team) {         // number of wins for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return w[sTon.get(team)];
+    }
+
+    public int losses(String team) {      // number of losses for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return l[sTon.get(team)];
+    }
+
+    public int remaining(String team) {  // number of remaining games for given team
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+        return r[sTon.get(team)];
+    }
+
+    public int against(String team1, String team2) {   // number of remaining games between team1 and team2
+        if (!sTon.containsKey(team1) || !sTon.containsKey(team2)) {
+            throw new IllegalArgumentException("one or both of the teams invalid.");
+        }
+        return g[sTon.get(team1)][sTon.get(team2)];
+    }
+
+    public boolean isEliminated(String team) {     // is given team eliminated?
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+
+        for (int i = 0; i < N; i++) {
+            if (i != sTon.get(team)) {
+                if (w[sTon.get(team)] + r[sTon.get(team)] < w[i]) {
+                    return true;
+                }
+            }
+        }
+
+        FlowNetwork maxflow = flownetwork(team);
+        int s = 0; //source
+        int t = maxflow.V() - 1; //sink
+
+        for (FlowEdge edge : maxflow.adj(s)) {
+            if(edge.flow() != edge.capacity()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private FlowNetwork flownetwork(String team) {
+        int nOfg = numberOfTeams() * (numberOfTeams() - 1) / 2 ;
+        //number of vertices = s + number of games + number of teams + sink
+        int nOfv = 1 + nOfg + numberOfTeams() + 1; 
+
+        int s = 0; //source
+        int t = nOfv - 1; //sink
+        int v = 1;
+
+        FlowNetwork maxflow = new FlowNetwork(nOfv);
+        for (int i = 0; i < g.length; i++) {
+            for (int j = i + 1; j < g[i].length; j++) {
+                maxflow.addEdge(new FlowEdge(s, v, g[i][j]));
+                maxflow.addEdge(new FlowEdge(v, nOfg + i + 1, Double.POSITIVE_INFINITY));
+                maxflow.addEdge(new FlowEdge(v, nOfg + j + 1, Double.POSITIVE_INFINITY));
+                v++;
+            }
+            int x;
+            if (w[sTon.get(team)] + r[sTon.get(team)] - w[i] > 0) {
+                x = w[sTon.get(team)] + r[sTon.get(team)] - w[i];
+            }
+            else x = 0;
+
+            maxflow.addEdge(new FlowEdge(v, t, x));
+        }
+        return maxflow;
+    }
+//     
+//     private FlowNetwork network (String team) {
+//         //number of games 
+//         int nOfg = numberOfTeams() * (numberOfTeams() - 1) / 2;
+//         //number of vertices 
+//         int nOfv = 1 + nOfv + numberOfTeams() + 1;
+//         //source
+//         int s = 0;
+//         //sink
+//         int t = nOfv - 1;
+//         int v = 1;
+//         FlowNetwork maxflow = new FlowNetwork(nOfv);
+//         
+//     }
+
+    public Iterable<String> certificateOfElimination(String team) { // subset R of teams that eliminates given team; null if not eliminated
+        if (!sTon.containsKey(team)) {
+            throw new IllegalArgumentException("invalid team.");
+        }
+
+        if (!isEliminated(team)) {
+            return null;
+        }
+
+        ArrayList<String> el = new ArrayList<String>();
+        int ng = numberOfTeams() * (numberOfTeams() - 1) / 2;
+        FlowNetwork maxflow = flownetwork(team);
+        int s = 0; //source
+        int t = maxflow.V() - 1; //sink
+        FordFulkerson ff = new FordFulkerson(maxflow, s, t);
+        for(String i : teams()) {
+            int id = sTon.get(i);
+            int v = ng + 1 + id;
+            if (ff.inCut(v)) {
+                el.add(i);
+            }
+        }
+
+        return el;
+    }
+
+    public static void main(String[] args) { //from assignment 
+        BaseballElimination division = new BaseballElimination(args[0]);
+        for (String team : division.teams()) {
+            if (division.isEliminated(team)) {
+                StdOut.print(team + " is eliminated by the subset R = { ");
+                for (String t : division.certificateOfElimination(team))
+                    StdOut.print(t + " ");
+                StdOut.println("}");
+            }
+            else {
+                StdOut.println(team + " is not eliminated");
+            }
+        }
+    }
+}
